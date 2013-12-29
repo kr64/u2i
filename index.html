@@ -37,14 +37,51 @@
 <p>Simple Arduino-based USB/serial to I2C/SMBus bridge.</p>
 
 <h3>
+<a name="new-features" class="anchor" href="#new-features"><span class="octicon octicon-link"></span></a>New Features</h3>
+
+<p>v0.4 29/12/2013 Status byte added (command z)</p>
+
+<h3>
+<a name="commands" class="anchor" href="#commands"><span class="octicon octicon-link"></span></a>Commands</h3>
+
+<ul>
+<li>
+<code>a [a..]</code> <em>view/set i2c address(es)</em>
+</li>
+<li>
+<code>f [speed]</code> <em>view/set bus frequency in kHz (kb/s)</em>
+</li>
+<li>
+<code>h</code> <em>show help</em>
+</li>
+<li>
+<code>r [c] [b]</code> <em>smbus read byte/word c=command b=nof</em>bytes_</li>
+<li>
+<code>s [a0] [a1]</code> <em>scan i2c bus from address a0 to a1</em>
+</li>
+<li>
+<code>v</code> <em>show version</em>
+</li>
+<li>
+<code>w [c] [b..]</code> <em>smbus write byte(s) c=command</em>
+</li>
+<li>
+<code>z [v]</code> <em>view/set status byte</em>
+</li>
+</ul><hr><p><em>Notes:</em></p>
+
+<ol>
+<li>all values to u2i in hex w/o format specified</li>
+<li>smbus write commands will be grouped by default</li>
+</ol><hr><h3>
 <a name="supported-arduino-platforms" class="anchor" href="#supported-arduino-platforms"><span class="octicon octicon-link"></span></a>Supported Arduino platforms</h3>
 
 <ol>
 <li><a href="http://arduino.cc/en/Main/arduinoBoardMicro">Arduino Micro</a></li>
-<li><a href="http://arduino.cc/en/Main/ArduinoBoardLeonardo">Arduino Leonardo</a></li>
-</ol><pre><code>$ cd your_repo_root/repo_name
-$ git fetch origin
-$ git checkout gh-pages
+<li>
+<a href="http://arduino.cc/en/Main/ArduinoBoardLeonardo">Arduino Leonardo</a><br>
+</li>
+</ol><pre><code>t.b.d.
 </code></pre>
 
 <h3>
