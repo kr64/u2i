@@ -2,6 +2,7 @@
 // (c) by kr64 Ltd. Proprietary. Confidential. Do not read or distribute unless authorized.
 
 // History:
+// 30/12/2013	v0.5	add group capability to write command
 // 25/12/2013	v0.4	read/write status ('z')
 // 24/12/2013	v0.3	set address range
 // 20/12/2013	v0.2	I2C address scan
@@ -19,7 +20,7 @@
 // Gateway USB/serial <-> I2C, SMBus
 
 // Commands:
-// t.b.d.
+// see help command
 
 // includes
 #include <Wire.h>
@@ -29,7 +30,7 @@
 // global register definitions
 
 // the following define is the most memory-efficient way to store the version string (in flash, ensured when SW_VERSION is instantiated)
-#define SW_VERSION "u2i v0.4 20131225 (c) kr64.com"
+#define SW_VERSION "u2i v0.50 20131230 (c) kr64.com"
 
 int bus_speed=100;
 int status=0;
@@ -153,9 +154,18 @@ int kri2c_read(byte addr,byte command, byte nof_bytes, byte *rxtxbuffer) {
   }
 }
 
-int kri2c_write(byte addr, byte nof_bytes, byte *rxtxbuffer) {
-  byte ack, nof, i;
-  Wire.beginTransmission(addr); nof=Wire.write(rxtxbuffer,nof_bytes); ack=Wire.endTransmission();
+int kri2c_write(byte *saddr, byte nof_slaves, byte nof_bytes, byte *rxtxbuffer) {
+  byte ack, i;
+  int nof;
+  for (nof=0, ack=0, i=0;i<nof_slaves;i++) {
+    if (i==nof_slaves-1) {
+      // last slave to be written to in group fashion: do send stoP
+      Wire.beginTransmission(saddr[i]); nof+=Wire.write(rxtxbuffer,nof_bytes); ack+=Wire.endTransmission();
+    } else {
+      // after command and byte(s) written: do not send stoP (instead, create a repeated start condition in order to group commands)
+      Wire.beginTransmission(saddr[i]); nof+=Wire.write(rxtxbuffer,nof_bytes); ack+=Wire.endTransmission((byte)false);
+    }
+  }
 //   Serial.print("nof=");Serial.print(nof, DEC);Serial.print("   ack="); Serial.println(ack, DEC);
 //   Serial.print("[");
 //   for (i=0;i<nof_bytes;i++) {
@@ -164,7 +174,7 @@ int kri2c_write(byte addr, byte nof_bytes, byte *rxtxbuffer) {
 //   }
 //   Serial.println("]");
   Serial.println(nof,HEX);
-  return (nof==nof_bytes && ack==0);
+  return (nof==(nof_slaves*nof_bytes) && ack==0);
 }
 
 // ***********************************************************************************************
@@ -343,7 +353,7 @@ void krstr_process_command_line(char *commandline) {
 	    krstr_error("value"); break;
 	  }
 	}
-	if (kri2c_write(saddr[0],i-1,rxtxbuffer)==0) {
+	if (kri2c_write(saddr,nof_slaves,i-1,rxtxbuffer)==0) {
 	  krstr_error("comms"); break;
 	}
 	break;
@@ -424,7 +434,8 @@ void krstr_process_command_line(char *commandline) {
 	Serial.println(F("z [v]       view/set status byte"));
 	krstr_line(20,'-');
 	Serial.println(F("1. all values to u2i in hex w/o format specified"));
-	Serial.println(F("2. smbus write commands will be grouped by default"));
+	Serial.println(F("2. smbus write commands will be grouped and sent to all set addresses"));
+	Serial.println(F("3. smbus read commands issued to first set address (only)"));
 	break;
       default:
 	krstr_error("syntax");
