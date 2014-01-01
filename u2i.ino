@@ -2,6 +2,7 @@
 // (c) by kr64 Ltd. Proprietary. Confidential. Do not read or distribute unless authorized.
 
 // History:
+// 01/01/2014	v0.x	resolve issue 01: undesirable two-line read response if comms failure ("[]\nError: comms\n")
 // 30/12/2013	v0.5	add group capability to write command
 // 25/12/2013	v0.4	read/write status ('z')
 // 24/12/2013	v0.3	set address range
@@ -30,7 +31,7 @@
 // global register definitions
 
 // the following define is the most memory-efficient way to store the version string (in flash, ensured when SW_VERSION is instantiated)
-#define SW_VERSION "u2i v0.50 20131230 (c) kr64.com"
+#define SW_VERSION "u2i v0.51 20140101 (c) kr64.com"
 
 int bus_speed=100;
 int status=0;
@@ -150,7 +151,8 @@ int kri2c_read(byte addr,byte command, byte nof_bytes, byte *rxtxbuffer) {
     Serial.println(F("]"));
     return 1;
   } else {
-    Serial.println(F("[]")); return 0;
+    // Serial.println(F("[]"));		this "[]" has turned out to be undesirable, as calling function produces an error message already
+    return 0;
   }
 }
 
