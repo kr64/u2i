@@ -2,7 +2,8 @@
 // (c) by kr64 Ltd. Proprietary. Confidential. Do not read or distribute unless authorized.
 
 // History:
-// 01/01/2014	v0.x	resolve issue 01: undesirable two-line read response if comms failure ("[]\nError: comms\n")
+// 02/01/2014	v0.6	add command t, statistical read
+// 01/01/2014	v0.51	resolve issue 01: undesirable two-line read response if comms failure ("[]\nError: comms\n")
 // 30/12/2013	v0.5	add group capability to write command
 // 25/12/2013	v0.4	read/write status ('z')
 // 24/12/2013	v0.3	set address range
@@ -31,7 +32,7 @@
 // global register definitions
 
 // the following define is the most memory-efficient way to store the version string (in flash, ensured when SW_VERSION is instantiated)
-#define SW_VERSION "u2i v0.51 20140101 (c) kr64.com"
+#define SW_VERSION "u2i v0.60 20140102 (c) kr64.com"
 
 int bus_speed=100;
 int status=0;
@@ -44,7 +45,7 @@ byte rxtxbuffer[MAX_RXTXBUFFER];
 
 // command line and tokens 
 const int MAX_TOKENS=MAX_SLAVES+1;
-const int MAX_CHAR_PER_TOKENS=6;
+const int MAX_CHAR_PER_TOKENS=8;
 const int COMMANDLINE_MAX_LENGTH=MAX_TOKENS*MAX_CHAR_PER_TOKENS;
 char commandline[COMMANDLINE_MAX_LENGTH]="";
 const char commandline_delimiter[]=" ,._";
@@ -168,15 +169,34 @@ int kri2c_write(byte *saddr, byte nof_slaves, byte nof_bytes, byte *rxtxbuffer) 
       Wire.beginTransmission(saddr[i]); nof+=Wire.write(rxtxbuffer,nof_bytes); ack+=Wire.endTransmission((byte)false);
     }
   }
-//   Serial.print("nof=");Serial.print(nof, DEC);Serial.print("   ack="); Serial.println(ack, DEC);
-//   Serial.print("[");
-//   for (i=0;i<nof_bytes;i++) {
-//     if (i) Serial.print(", ");
-//     Serial.print(rxtxbuffer[i],HEX);
-//   }
-//   Serial.println("]");
   Serial.println(nof,HEX);
   return (nof==(nof_slaves*nof_bytes) && ack==0);
+}
+
+int kri2c_statr2s(byte addr, byte command, unsigned long nof_words) {
+  byte nof, ack, ok;
+  int value;
+  unsigned long i_long;
+  float sum;
+  int value_min, value_max;
+  sum=0.0; value_min=0x7FFF; value_max=0x8000;
+  for (i_long=0, ok=1; i_long<nof_words && ok; i_long++) {
+    Wire.beginTransmission(addr); Wire.write(command); ack=Wire.endTransmission((byte)false);	// send address and command. Sr (repeated start)
+    delayMicroseconds(10);	// N.B.: this delay was found to be necessary otherwise highly sporadic errors occur.
+				// when the error occurs, the Arduino I2C master fails to address the I2C slave correctly during the following Sr
+    nof=Wire.requestFrom(addr, (byte)2, (byte)true);
+    if (ack || nof!=2) { ok=0; break; }
+    value=Wire.read(); value+=(Wire.read()<<8);
+    // if (value==0xFFFF) { ok=0; Serial.print(addr,DEC); break; }
+    if (value<value_min) value_min=value;
+    if (value>value_max) value_max=value;
+    sum+=(float)value;
+  }
+  sum=sum/(float)nof_words;
+  if (ok) {
+    Serial.print("["); Serial.print(value_min,HEX); Serial.print(", "); Serial.print(value_max,HEX); Serial.print(", "); Serial.print(sum,2); Serial.println("]");
+  }
+  return (ok);
 }
 
 // ***********************************************************************************************
@@ -319,7 +339,7 @@ void krstr_line(int nr, char c) {
 void krstr_process_command_line(char *commandline) {
   byte value0, value1;
   int i;
-  unsigned long temp_value;
+  unsigned long temp_value, value_long0;
   krstr_cleanup(commandline);
   i=krstr_tokenize(commandline);
 //   Serial.print("Reduced to ");
@@ -357,6 +377,27 @@ void krstr_process_command_line(char *commandline) {
 	}
 	if (kri2c_write(saddr,nof_slaves,i-1,rxtxbuffer)==0) {
 	  krstr_error("comms"); break;
+	}
+	break;
+      case 't':
+	if (i<3) {
+	  krstr_error("syntax");
+	} else {
+	  // token[1] holds the command
+	  if (krstr_to_hex(tokens[1],&temp_value)) {
+	    value0=constrain((byte)temp_value,0,255);
+	  } else {
+	    krstr_error("value"); break;
+	  }
+	  // token[2] holds the number of (word) reads. long
+	  if (krstr_to_hex(tokens[2],&temp_value)) {
+	    value_long0=temp_value;
+	  } else {
+	    krstr_error("value"); break;
+	  }
+	  if (kri2c_statr2s(saddr[0],value0,value_long0)==0) {
+	    krstr_error("comms"); break;
+	  }
 	}
 	break;
       case 'a':
@@ -429,10 +470,11 @@ void krstr_process_command_line(char *commandline) {
 	Serial.println(F("a [a..]     view/set i2c address(es)"));
 	Serial.println(F("f [speed]   view/set bus frequency in kHz (kb/s)"));
 	Serial.println(F("h           show help"));
-	Serial.println(F("r [c] [b]   smbus read byte/word c=command b=nof_bytes"));
+	Serial.println(F("r c b       smbus read byte/word c=command b=nof_bytes"));
 	Serial.println(F("s [a0] [a1] scan i2c bus from address a0 to a1"));
+	Serial.println(F("t c n       statistical read using command c reading n words"));
 	Serial.println(F("v           show version"));
-	Serial.println(F("w [c] [b..] smbus write byte(s) c=command"));
+	Serial.println(F("w c b..     smbus write byte(s) c=command"));
 	Serial.println(F("z [v]       view/set status byte"));
 	krstr_line(20,'-');
 	Serial.println(F("1. all values to u2i in hex w/o format specified"));
