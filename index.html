@@ -40,9 +40,10 @@
 <a name="new-features" class="anchor" href="#new-features"><span class="octicon octicon-link"></span></a>New Features</h3>
 
 <p>
+<strong>v0.6</strong> 02/01/2014 statistical read command t implemented<br>
 <strong>v0.51</strong> 01/01/2014 issue 01 resolved (undesirable 2-line response following comms error)<br>
-<strong>v0.5&nbsp;</strong> 30/12/2013 Write command grouping<br>
-<strong>v0.4&nbsp;</strong> 29/12/2013 Status byte added (command z)
+<strong>v0.5</strong> 30/12/2013 Write command grouping<br>
+<strong>v0.4</strong> 29/12/2013 Status byte added (command z)
 </p>
 
 <h3>
@@ -59,15 +60,18 @@
 <code>h</code> <em>show help</em>
 </li>
 <li>
-<code>r [c] [b]</code> <em>smbus read byte/word c=command b=nof</em>bytes_</li>
+<code>r c b</code> <em>smbus read byte/word c=command b=nof_bytes</em></li>
 <li>
 <code>s [a0] [a1]</code> <em>scan i2c bus from address a0 to a1</em>
+</li>
+<li>
+<code>t c b</code> <em>statistical read-word c=command b=nof_words</em></li>
 </li>
 <li>
 <code>v</code> <em>show version</em>
 </li>
 <li>
-<code>w [c] [b..]</code> <em>smbus write byte(s) c=command</em>
+<code>w c b..</code> <em>smbus write byte(s) c=command</em>
 </li>
 <li>
 <code>z [v]</code> <em>view/set status byte</em>
