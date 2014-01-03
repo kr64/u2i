@@ -40,6 +40,7 @@
 <a name="new-features" class="anchor" href="#new-features"><span class="octicon octicon-link"></span></a>New Features</h3>
 
 <p>
+<strong>v0.7</strong> 03/01/2014 add salrt/ARA capabilities<br>
 <strong>v0.6</strong> 02/01/2014 statistical read command t implemented<br>
 <strong>v0.51</strong> 01/01/2014 issue 01 resolved (undesirable 2-line response following comms error)<br>
 <strong>v0.5</strong> 30/12/2013 Write command grouping<br>
@@ -60,7 +61,11 @@
 <code>h</code> <em>show help</em>
 </li>
 <li>
-<code>r c b</code> <em>smbus read byte/word c=command b=nof_bytes</em></li>
+<code>l [p]</code> <em>view salrt status (no p). clears if p=0. arp if p=1</em>
+</li>
+<li>
+<code>r c b</code> <em>smbus read byte/word c=command b=nof_bytes</em>
+</li>
 <li>
 <code>s [a0] [a1]</code> <em>scan i2c bus from address a0 to a1</em>
 </li>
