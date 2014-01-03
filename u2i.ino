@@ -2,6 +2,7 @@
 // (c) by kr64 Ltd. Proprietary. Confidential. Do not read or distribute unless authorized.
 
 // History:
+// 03/01/2014	v0.7	add salrt/ARA capabilities
 // 02/01/2014	v0.6	add command t, statistical read
 // 01/01/2014	v0.51	resolve issue 01: undesirable two-line read response if comms failure ("[]\nError: comms\n")
 // 30/12/2013	v0.5	add group capability to write command
@@ -29,10 +30,24 @@
 #include <string.h>
 #include <ctype.h>
 
-// global register definitions
-
 // the following define is the most memory-efficient way to store the version string (in flash, ensured when SW_VERSION is instantiated)
-#define SW_VERSION "u2i v0.60 20140102 (c) kr64.com"
+#define SW_VERSION "u2i v0.7 20140103 (c) kr64.com"
+
+// ***********************************************************************************************
+// u2i i/o definitions
+// ***********************************************************************************************
+const int led_red = 8;		// ATMEGA32U4 PB4 Arduino-micro-mapped to IO8
+const int led_yellow = 9;	// ATMEGA32U4 PB5 Arduino-micro-mapped to IO9 (also PWM16b)
+const int led_green = 10;	// ATMEGA32U4 PB6 Arduino-micro-mapped to IO10 (also PWM16b)
+
+// interrupt-capable salrt
+const int salrt = 0;		// ATMEGA32U4 INT2/PD2 Arduino-micro-mapped to D0/RX
+				// ATMEGA32U4 INT3/PD3 Arduino-micro-mapped to D1/TX
+
+
+// ***********************************************************************************************
+// global defines and registers
+// ***********************************************************************************************
 
 int bus_speed=100;
 int status=0;
@@ -51,11 +66,7 @@ char commandline[COMMANDLINE_MAX_LENGTH]="";
 const char commandline_delimiter[]=" ,._";
 char tokens[MAX_TOKENS][MAX_CHAR_PER_TOKENS];
 
-// u2i test system connections
-const int led_red = 8;
-const int led_yellow = 9;
-const int led_green = 10;
-
+volatile unsigned int salrt_events;
 
 void setup() {
   int i;
@@ -63,6 +74,9 @@ void setup() {
   // configure serial interface
   Serial.begin(9600);
   Wire.begin();
+  pinMode(salrt, INPUT);
+  digitalWrite(salrt, HIGH);	// engage internal pull-up
+  salrt_events=0;		// interrupt managed
 
   // configure ports for LED outputs
   pinMode(led_red, OUTPUT);     
@@ -81,6 +95,10 @@ void setup() {
   // set default slave address
   for (i=1; i<MAX_SLAVES; i++) saddr[i]=0;
   saddr[0]=0x10; nof_slaves=1;
+
+  // enable interrupt service routine(s)
+  attachInterrupt(2, isr_salrt, FALLING);
+
 }
 
 void loop() {
@@ -197,6 +215,41 @@ int kri2c_statr2s(byte addr, byte command, unsigned long nof_words) {
     Serial.print("["); Serial.print(value_min,HEX); Serial.print(", "); Serial.print(value_max,HEX); Serial.print(", "); Serial.print(sum,2); Serial.println("]");
   }
   return (ok);
+}
+
+void kri2c_salrt(byte ara) {
+  byte nof_responses, nof_ara, slave_ara, slave_ara_prev;
+  int salrt_poll;
+  salrt_poll=digitalRead(salrt);
+  switch (ara) {
+    case 0:
+      noInterrupts(); salrt_events=0; interrupts();
+    case 1:
+      Serial.print(F("[")); Serial.print(salrt_poll); Serial.print(F(", ")); Serial.print(salrt_events,HEX); Serial.println(F("]")); 
+      break;
+    default:
+      nof_ara=0; slave_ara_prev=-1;
+      Serial.print(F("["));
+      while (nof_ara<MAX_SLAVES && salrt_poll==0) {
+	nof_responses=Wire.requestFrom((byte)12, (byte)1, (byte)true);		// request ARP
+	delayMicroseconds(10);
+	if (nof_responses==1) {
+	  delayMicroseconds(10); slave_ara=(Wire.read()>>1);
+	  if (slave_ara==slave_ara_prev) break;		// if a single slave has a persistent fault, stop ARA-ing
+	  slave_ara_prev=slave_ara;
+	  if (nof_ara) Serial.print(F(", "));
+	  Serial.print(slave_ara,HEX);
+	  nof_ara++;
+	} else break;
+	salrt_poll=digitalRead(salrt);
+      }
+      Serial.println(F("]"));
+      break;
+  }
+}
+
+void isr_salrt() {
+  if (salrt_events!=0xFFFF) salrt_events++;
 }
 
 // ***********************************************************************************************
@@ -379,6 +432,17 @@ void krstr_process_command_line(char *commandline) {
 	  krstr_error("comms"); break;
 	}
 	break;
+      case 'l':
+	if (i<2) {
+	  kri2c_salrt(1);	// just produce status
+	} else {
+	  if (tokens[1][0]=='0') {
+	    kri2c_salrt(0);	// clear salrt events counter, then produce status
+	  } else {
+	    kri2c_salrt(2);	// carry out a full ARP
+	  }
+	}
+	break;
       case 't':
 	if (i<3) {
 	  krstr_error("syntax");
@@ -470,6 +534,7 @@ void krstr_process_command_line(char *commandline) {
 	Serial.println(F("a [a..]     view/set i2c address(es)"));
 	Serial.println(F("f [speed]   view/set bus frequency in kHz (kb/s)"));
 	Serial.println(F("h           show help"));
+	Serial.println(F("l [p]       view salrt status (no p). clears if p=0. arp if p=1"));
 	Serial.println(F("r c b       smbus read byte/word c=command b=nof_bytes"));
 	Serial.println(F("s [a0] [a1] scan i2c bus from address a0 to a1"));
 	Serial.println(F("t c n       statistical read using command c reading n words"));
